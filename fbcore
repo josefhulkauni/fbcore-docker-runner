@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# arguments:
+#   start, up, s    - creates and run containers
+#   stop, down      - stops and removes containers
+#   si              - start with initData
+#   sia             - start with initData for alegro
+
+
+cmd=$1
+development_json_path=~/.uu/config/development.json
+docker_compose_file=~/work/fbcore/src/usy_fbcore_initdatag01/docker/development/docker-compose.yml
+ip_address=$( get_primary_ip )
+
+function get_ip {
+    ip address show dev $1 | grep "inet " | awk -F'[/ ]+' '{ print $3 }'
+}
+
+function get_primary_ip {
+    local ip=$( get_ip eno1 )
+    if [ -z "$ip" ] 
+    then
+        ip=$( get_ip wlp110s0 )
+    fi
+    echo $ip
+}
+
+function update_configuration {    
+    if [ -z "$ip_address" ] 
+    then
+        echo "No ip addres to be set!"
+        # TODO return error code
+    else
+        echo "set localGateway to $ip_address"
+        local  search=\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b
+        sed -i -e "s/[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/${ip_address}/g" $development_json_path
+    fi
+}
+
+function start_docker {
+	echo "setup local address"
+	update_configuration
+	echo "Starting FBCORE docker environment"
+    /usr/bin/docker-compose -f $docker_compose_file pull
+    /usr/bin/docker-compose -f $docker_compose_file up -d
+}
+
+function stop_docker {
+	echo "stopping docker containers"
+	/usr/bin/docker-compose -f $docker_compose_file down
+	echo "docker containers has been removed"
+}
+
+function init_data {
+    docker pull usyfbcore/usy_fbcore_initdata:latest
+    local server_cfg={\"localGateway\":\"$ip_address\"}
+    docker run -v $development_json_path:/root/.uu/config/development.json --rm usyfbcore/usy_fbcore_initdata:latest $1
+}
+
+if [ $cmd = "stop" ] || [ $cmd = "down" ]
+then 
+    stop_docker
+elif [ $cmd = "start" ] || [ $cmd = "up" ]
+then
+    start_docker
+elif [ $cmd = "si" ]
+then
+    start_docker
+    init_data initLocal
+elif [ $cmd = "sia" ]
+then
+    start_docker
+    init_data initLocalAlegro
+else
+    echo "Unsupported operation"
+fi
