@@ -10,7 +10,6 @@
 cmd=$1
 development_json_path=~/.uu/config/development.json
 docker_compose_file=~/work/fbcore/src/usy_fbcore_initdatag01/docker/development/docker-compose.yml
-ip_address=$( get_primary_ip )
 
 function get_ip {
     ip address show dev $1 | grep "inet " | awk -F'[/ ]+' '{ print $3 }'
@@ -24,6 +23,8 @@ function get_primary_ip {
     fi
     echo $ip
 }
+
+ip_address=$( get_primary_ip )
 
 function update_configuration {    
     if [ -z "$ip_address" ] 
